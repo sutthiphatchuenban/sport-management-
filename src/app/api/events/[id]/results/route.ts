@@ -13,8 +13,8 @@ export async function GET(
         const results = await prisma.eventResult.findMany({
             where: { eventId: id },
             include: {
-                color: { select: { name: true, hexCode: true } },
-                athlete: { select: { firstName: true, lastName: true, nickname: true } },
+                color: { select: { id: true, name: true, hexCode: true } },
+                athlete: { select: { firstName: true, lastName: true, nickname: true, photoUrl: true } },
             },
             orderBy: { rank: 'asc' },
         })
@@ -71,6 +71,7 @@ export async function POST(
                             athleteId: res.athleteId || null,
                             rank: res.rank,
                             points: res.points,
+                            score: res.score ?? null,
                             notes: res.notes,
                             recordedBy: session.user.id,
                         },

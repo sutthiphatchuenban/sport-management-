@@ -5,6 +5,19 @@ import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { th } from "date-fns/locale"
 
+interface MatchScore {
+    team1: {
+        name: string
+        colorHex: string
+        score: number
+    }
+    team2: {
+        name: string
+        colorHex: string
+        score: number
+    }
+}
+
 interface EventCardProps {
     name: string
     sportType: string
@@ -12,6 +25,7 @@ interface EventCardProps {
     time: string
     location?: string | null
     status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
+    matchScore?: MatchScore | null
     className?: string
 }
 
@@ -22,6 +36,7 @@ export function EventCard({
     time,
     location,
     status,
+    matchScore,
     className
 }: EventCardProps) {
     const statusConfig = {
@@ -55,6 +70,41 @@ export function EventCard({
                                 {currentStatus.label}
                             </Badge>
                         </div>
+
+                        {/* Match Score Display */}
+                        {matchScore && status === 'COMPLETED' && (
+                            <div className="flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white/5 border border-white/10">
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="h-6 w-6 rounded-full border-2 border-white/20"
+                                        style={{ backgroundColor: matchScore.team1.colorHex }}
+                                    />
+                                    <span className="font-bold text-sm">{matchScore.team1.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span
+                                        className="text-2xl font-black"
+                                        style={{ color: matchScore.team1.colorHex }}
+                                    >
+                                        {matchScore.team1.score}
+                                    </span>
+                                    <span className="text-lg font-bold text-muted-foreground">-</span>
+                                    <span
+                                        className="text-2xl font-black"
+                                        style={{ color: matchScore.team2.colorHex }}
+                                    >
+                                        {matchScore.team2.score}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm">{matchScore.team2.name}</span>
+                                    <div
+                                        className="h-6 w-6 rounded-full border-2 border-white/20"
+                                        style={{ backgroundColor: matchScore.team2.colorHex }}
+                                    />
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4 pt-2">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">

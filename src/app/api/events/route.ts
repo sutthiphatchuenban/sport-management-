@@ -10,6 +10,7 @@ export async function GET(req: Request) {
         const status = searchParams.get('status')
         const sportTypeId = searchParams.get('sportTypeId')
         const date = searchParams.get('date')
+        const includeResults = searchParams.get('includeResults') === 'true'
 
         const where: any = {}
         if (status && status !== 'ALL') where.status = status
@@ -26,6 +27,13 @@ export async function GET(req: Request) {
             include: {
                 sportType: { select: { name: true, category: true } },
                 _count: { select: { registrations: true, results: true } },
+                // Include results for showing match scores
+                results: includeResults || status === 'COMPLETED' ? {
+                    orderBy: { rank: 'asc' },
+                    include: {
+                        color: { select: { id: true, name: true, hexCode: true } },
+                    },
+                } : false,
             },
             orderBy: [
                 { date: 'asc' },

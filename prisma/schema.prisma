@@ -220,7 +220,8 @@ model EventResult {
   colorId    String
   athleteId  String?  // สำหรับกีฬาบุคคล
   rank       Int
-  points     Int
+  points     Int      // คะแนนที่ได้ไปคิดรวม (เช่น +10, +8)
+  score      Int?     // คะแนนจริงในแมช (เช่น 5 ใน 5-0)
   notes      String?
   recordedBy String?
   recordedAt DateTime @default(now())

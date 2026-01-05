@@ -9,8 +9,32 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import Link from 'next/link'
 
+interface EventResult {
+    rank: number
+    score?: number | null
+    color: {
+        id: string
+        name: string
+        hexCode: string
+    }
+}
+
+interface Event {
+    id: string
+    name: string
+    date: string
+    time: string
+    location?: string
+    status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
+    sportType: {
+        name: string
+        category: 'INDIVIDUAL' | 'TEAM'
+    }
+    results?: EventResult[]
+}
+
 export default function ResultsListPage() {
-    const [events, setEvents] = useState<any[]>([])
+    const [events, setEvents] = useState<Event[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [sportType, setSportType] = useState('ALL')
@@ -55,11 +79,34 @@ export default function ResultsListPage() {
         return () => clearInterval(interval)
     }, [search, sportType])
 
+    // Helper function to extract match score from results
+    const getMatchScore = (event: Event) => {
+        if (!event.results || event.results.length !== 2) return null
+
+        const sortedResults = [...event.results].sort((a, b) => a.rank - b.rank)
+        const hasScores = sortedResults.every(r => r.score !== null && r.score !== undefined)
+
+        if (!hasScores) return null
+
+        return {
+            team1: {
+                name: `สี${sortedResults[0].color.name}`,
+                colorHex: sortedResults[0].color.hexCode,
+                score: sortedResults[0].score ?? 0,
+            },
+            team2: {
+                name: `สี${sortedResults[1].color.name}`,
+                colorHex: sortedResults[1].color.hexCode,
+                score: sortedResults[1].score ?? 0,
+            },
+        }
+    }
+
     return (
         <div className="container mx-auto px-4 py-8 space-y-8 min-h-[60vh]">
             <PageHeader
                 title="ผลการแข่งขัน"
-                description="สรุปผลการแข่งขันและทำเนียบผู้ชนะในแต่ละรายการ"
+                description="สรุปผลการแข่งขันและคะแนนในแต่ละแมช"
             />
 
             {/* Filters */}
@@ -99,6 +146,7 @@ export default function ResultsListPage() {
                                 time={event.time}
                                 location={event.location}
                                 status={event.status}
+                                matchScore={getMatchScore(event)}
                             />
                         </Link>
                     ))}

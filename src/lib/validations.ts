@@ -79,6 +79,7 @@ export const eventResultSchema = z.object({
         athleteId: z.string().optional(),
         rank: z.number().positive(),
         points: z.number().min(0),
+        score: z.number().min(0).optional(), // คะแนนจริงในแมช เช่น 5 ใน 5-0
         notes: z.string().optional(),
     })),
     reason: z.string().optional(), // Required for updates
