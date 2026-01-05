@@ -75,14 +75,14 @@ export function MatchCard({ match }: MatchCardProps) {
 
                     {/* Scores */}
                     <div className="flex-shrink-0 flex items-center gap-3">
-                        <span className={`text-4xl font-black tabular-nums tracking-tighter ${isCompleted || isLive ? 'text-white' : 'text-white/20'
+                        <span className={`text-4xl font-black tabular-nums tracking-tighter ${isCompleted || isLive ? 'text-foreground' : 'text-muted-foreground'
                             }`}>
                             {match.homeScore ?? '-'}
                         </span>
                         <div className="flex flex-col items-center gap-1">
                             <span className="text-xs font-bold text-muted-foreground uppercase opacity-50">VS</span>
                         </div>
-                        <span className={`text-4xl font-black tabular-nums tracking-tighter ${isCompleted || isLive ? 'text-white' : 'text-white/20'
+                        <span className={`text-4xl font-black tabular-nums tracking-tighter ${isCompleted || isLive ? 'text-foreground' : 'text-muted-foreground'
                             }`}>
                             {match.awayScore ?? '-'}
                         </span>
