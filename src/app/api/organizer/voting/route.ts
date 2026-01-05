@@ -27,20 +27,22 @@ export async function GET() {
     }
 }
 
-// POST /api/organizer/voting/:eventId - Update settings for a specific event
-export async function POST(
-    req: Request,
-    { params }: { params: Promise<{ eventId: string }> }
-) {
+// POST /api/organizer/voting - Update settings for a specific event
+export async function POST(req: Request) {
     try {
         const session = await auth()
         if (!session || (session.user.role !== 'ADMIN' && session.user.role !== 'ORGANIZER')) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const eventId = (await params).eventId
         const body = await req.json()
-        const validatedData = voteSettingsSchema.parse(body)
+        const { eventId, ...settingsBody } = body
+
+        if (!eventId) {
+            return NextResponse.json({ error: 'eventId is required' }, { status: 400 })
+        }
+
+        const validatedData = voteSettingsSchema.parse(settingsBody)
 
         const existingSettings = await prisma.voteSetting.findFirst({
             where: { eventId }
