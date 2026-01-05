@@ -8,16 +8,16 @@ import {
     ChevronLeft,
     Save,
     Trophy,
-    Users,
     CheckCircle2,
-    Clock,
-    MapPin,
     Plus,
     Trash2,
     Loader2,
     Medal,
     Search,
-    Calendar
+    Calendar,
+    Clock,
+    MapPin,
+    Swords // Icon for matches
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -31,10 +31,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { MatchListEditor } from '@/components/organizer/match-list-editor'
 
 export default function EventResultsPage() {
     const params = useParams()
@@ -48,6 +50,7 @@ export default function EventResultsPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
+    const [activeTab, setActiveTab] = useState('overall')
 
     useEffect(() => {
         const fetchData = async () => {
@@ -71,8 +74,12 @@ export default function EventResultsPage() {
                 if (resultsData && resultsData.length > 0) {
                     setResults(resultsData)
                 } else {
-                    // Start with an empty result if none exist
-                    setResults([{ colorId: '', athleteId: '', rank: 1, points: 0 }])
+                    setResults([{ colorId: '', athleteId: '', rank: 1, points: 0, score: 0 }])
+                }
+
+                // If Team Sport, default to matches tab
+                if (eventData.sportType?.category === 'TEAM') {
+                    setActiveTab('matches')
                 }
             } catch (error) {
                 toast.error('ไม่สามารถโหลดข้อมูลได้')
@@ -86,12 +93,11 @@ export default function EventResultsPage() {
     const handleAddResult = () => {
         const nextRank = results.length + 1
         const defaultPoints = scoringRules.find(r => r.rank === nextRank)?.points || 0
-        setResults([...results, { colorId: '', athleteId: '', rank: nextRank, points: defaultPoints }])
+        setResults([...results, { colorId: '', athleteId: '', rank: nextRank, points: defaultPoints, score: 0 }])
     }
 
     const removeResult = (index: number) => {
         const newResults = results.filter((_, i) => i !== index)
-        // Re-adjust ranks and points
         const adjustedResults = newResults.map((res, i) => {
             const rank = i + 1
             const points = scoringRules.find(r => r.rank === rank)?.points || 0
@@ -119,7 +125,6 @@ export default function EventResultsPage() {
     }
 
     const handleSave = async () => {
-        // Validation
         const isValid = results.every(r => r.colorId && r.rank)
         if (!isValid) {
             toast.error('กรุณาระบุข้อมูลสีและอันดับให้ครบถ้วน')
@@ -150,7 +155,7 @@ export default function EventResultsPage() {
     }
 
     if (loading) return (
-        <div className="space-y-8 animate-pulse">
+        <div className="space-y-8 animate-pulse container mx-auto px-4 py-8">
             <Skeleton className="h-12 w-64 rounded-xl" />
             <Skeleton className="h-64 w-full rounded-3xl" />
             <Skeleton className="h-[400px] w-full rounded-3xl" />
@@ -164,7 +169,7 @@ export default function EventResultsPage() {
     )
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 container mx-auto px-4 py-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" asChild className="rounded-xl">
@@ -173,7 +178,7 @@ export default function EventResultsPage() {
                         </Link>
                     </Button>
                     <PageHeader
-                        title="บันทึกผลการแข่งขัน"
+                        title="จัดการผลการแข่งขัน"
                         description={`รายการ: ${event.name} (${event.sportType.name})`}
                     />
                 </div>
@@ -214,15 +219,6 @@ export default function EventResultsPage() {
                                     <p className="text-sm font-bold">{event.time} น.</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground">
-                                    <MapPin className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40 leading-none">สถานที่</p>
-                                    <p className="text-sm font-bold">{event.location || 'ไม่ได้ระบุสถานที่'}</p>
-                                </div>
-                            </div>
                         </div>
 
                         <div className="pt-6 border-t border-white/5">
@@ -230,7 +226,6 @@ export default function EventResultsPage() {
                                 <h4 className="font-black text-xs uppercase tracking-widest opacity-60">นักกีฬาที่ลงทะเบียน</h4>
                                 <Badge variant="outline" className="rounded-md border-white/10 opacity-50">{registrations.length} คน</Badge>
                             </div>
-
                             <div className="relative mb-4">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-50" />
                                 <Input
@@ -240,15 +235,15 @@ export default function EventResultsPage() {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
-
-                            <div className="space-y-2 max-h-[300px] overflow-y-auto no-scrollbar pr-1">
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto w-full no-scrollbar pr-1">
                                 {filteredRegistrations.map((reg: any) => (
                                     <div key={reg.id} className="p-3 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <div className="h-2 w-2 rounded-full" style={{ backgroundColor: reg.color.hexCode }} />
-                                            <span className="text-xs font-bold">{reg.athlete.firstName} {reg.athlete.lastName}</span>
+                                            <span className="text-xs font-bold truncate max-w-[120px]" title={`${reg.athlete.firstName} ${reg.athlete.lastName}`}>
+                                                {reg.athlete.firstName} {reg.athlete.lastName}
+                                            </span>
                                         </div>
-                                        <span className="text-[10px] uppercase font-black opacity-30 tracking-tighter">{reg.athlete.studentId}</span>
                                     </div>
                                 ))}
                             </div>
@@ -256,113 +251,128 @@ export default function EventResultsPage() {
                     </CardContent>
                 </Card>
 
-                {/* Score Recording Section */}
-                <Card className="lg:col-span-2 glass border-none rounded-3xl overflow-hidden">
-                    <CardHeader className="bg-white/5 pb-8 flex flex-row items-center justify-between">
-                        <div className="space-y-1">
-                            <CardTitle className="text-xl font-black flex items-center gap-2">
-                                <Medal className="h-5 w-5 text-amber-500" />
-                                บันทึกผลและคะแนน
-                            </CardTitle>
-                            <CardDescription>จัดอันดับผู้ชนะและคำนวณคะแนนตามเกณฑ์ระบบ</CardDescription>
-                        </div>
-                        <Button onClick={handleAddResult} variant="outline" size="sm" className="rounded-xl glass border-white/10 font-bold">
-                            <Plus className="mr-2 h-4 w-4" />
-                            เพิ่มอันดับ
-                        </Button>
-                    </CardHeader>
-                    <CardContent className="p-8">
-                        <div className="space-y-4">
-                            {results.map((res, idx) => (
-                                <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 grid grid-cols-1 md:grid-cols-12 gap-4 items-end animate-in fade-in slide-in-from-right-4 duration-300">
-                                    <div className="md:col-span-2 space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">อันดับ</Label>
-                                        <Select onValueChange={(val) => updateResult(idx, 'rank', val)} value={res.rank.toString()}>
-                                            <SelectTrigger className="glass h-11 rounded-xl font-black">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="glass border-white/10 rounded-xl">
-                                                {[1, 2, 3, 4, 5, 6, 7, 8].map(r => (
-                                                    <SelectItem key={r} value={r.toString()} className="rounded-lg">อันดับที่ {r}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                {/* Main Content Area with Tabs */}
+                <div className="lg:col-span-2 space-y-6">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 bg-white/5 p-1 rounded-2xl mb-6">
+                            <TabsTrigger value="matches" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                                <Swords className="h-4 w-4 mr-2" />
+                                จัดการแมตช์ (Matches)
+                            </TabsTrigger>
+                            <TabsTrigger value="overall" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                                <Medal className="h-4 w-4 mr-2" />
+                                สรุปอันดับรวม (Overall)
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="matches" className="animate-in fade-in zoom-in-95 duration-300">
+                            <MatchListEditor eventId={id} />
+                        </TabsContent>
+
+                        <TabsContent value="overall" className="animate-in fade-in zoom-in-95 duration-300">
+                            <Card className="glass border-none rounded-3xl overflow-hidden">
+                                <CardHeader className="bg-white/5 pb-8 flex flex-row items-center justify-between">
+                                    <div className="space-y-1">
+                                        <CardTitle className="text-xl font-black flex items-center gap-2">
+                                            <Medal className="h-5 w-5 text-amber-500" />
+                                            สรุปอันดับและคะแนนรวม
+                                        </CardTitle>
+                                        <CardDescription>จัดอันดับผู้ชนะและคำนวณคะแนนรวมเพื่อนำไปคิดคะแนนถ้วยรวม</CardDescription>
+                                    </div>
+                                    <Button onClick={handleAddResult} variant="outline" size="sm" className="rounded-xl glass border-white/10 font-bold">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        เพิ่มอันดับ
+                                    </Button>
+                                </CardHeader>
+                                <CardContent className="p-8">
+                                    <div className="space-y-4">
+                                        {results.map((res, idx) => (
+                                            <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                                                <div className="md:col-span-2 space-y-2">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">อันดับ</Label>
+                                                    <Select onValueChange={(val) => updateResult(idx, 'rank', val)} value={res.rank.toString()}>
+                                                        <SelectTrigger className="glass h-11 rounded-xl font-black">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="glass border-white/10 rounded-xl">
+                                                            {[1, 2, 3, 4, 5, 6, 7, 8].map(r => (
+                                                                <SelectItem key={r} value={r.toString()} className="rounded-lg">อันดับที่ {r}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div className="md:col-span-5 space-y-2">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">นักกีฬา / สีทีม</Label>
+                                                    <Select onValueChange={(val) => updateResult(idx, 'athleteId', val)} value={res.athleteId}>
+                                                        <SelectTrigger className="glass h-11 rounded-xl">
+                                                            <SelectValue placeholder="เลือกผู้เข้าแข่งขัน" />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="glass border-white/10 rounded-xl">
+                                                            {registrations.map((reg) => (
+                                                                <SelectItem key={reg.athleteId} value={reg.athleteId} className="rounded-lg">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: reg.color.hexCode }} />
+                                                                        {reg.athlete.firstName} ({reg.color.name})
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <div className="md:col-span-2 space-y-2">
+                                                    <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">คะแนนสะสม</Label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            type="number"
+                                                            value={res.points}
+                                                            onChange={(e) => updateResult(idx, 'points', parseInt(e.target.value) || 0)}
+                                                            className="glass h-11 rounded-xl font-bold pl-10"
+                                                        />
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black opacity-30 uppercase tracking-widest">PTS</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="md:col-span-1 flex justify-end">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeResult(idx)}
+                                                        className="text-destructive hover:bg-destructive/10 rounded-xl h-11 w-11"
+                                                        disabled={results.length === 1}
+                                                    >
+                                                        <Trash2 className="h-5 w-5" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
 
-                                    <div className="md:col-span-5 space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">นักกีฬา / สีทีม</Label>
-                                        <Select onValueChange={(val) => updateResult(idx, 'athleteId', val)} value={res.athleteId}>
-                                            <SelectTrigger className="glass h-11 rounded-xl">
-                                                <SelectValue placeholder="เลือกผู้เข้าแข่งขัน" />
-                                            </SelectTrigger>
-                                            <SelectContent className="glass border-white/10 rounded-xl">
-                                                {registrations.map((reg) => (
-                                                    <SelectItem key={reg.athleteId} value={reg.athleteId} className="rounded-lg">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: reg.color.hexCode }} />
-                                                            {reg.athlete.firstName} ({reg.color.name})
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="md:col-span-3 space-y-2">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-40">คะแนนสะสม</Label>
-                                        <div className="relative">
-                                            <Input
-                                                type="number"
-                                                value={res.points}
-                                                onChange={(e) => updateResult(idx, 'points', parseInt(e.target.value) || 0)}
-                                                className="glass h-11 rounded-xl font-bold pl-10"
-                                            />
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black opacity-30 uppercase tracking-widest">PTS</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="md:col-span-2 flex justify-end">
+                                    <div className="pt-8 flex justify-end">
                                         <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => removeResult(idx)}
-                                            className="text-destructive hover:bg-destructive/10 rounded-xl h-11 w-11"
-                                            disabled={results.length === 1}
+                                            onClick={handleSave}
+                                            disabled={saving}
+                                            className="h-14 rounded-2xl px-12 shadow-glow bg-emerald-600 hover:bg-emerald-500 font-black text-lg min-w-[200px]"
                                         >
-                                            <Trash2 className="h-5 w-5" />
+                                            {saving ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                    กำลังบันทึก...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Save className="mr-2 h-5 w-5" />
+                                                    บันทึกสรุปผล
+                                                </>
+                                            )}
                                         </Button>
                                     </div>
-                                </div>
-                            ))}
-
-                            {results.length === 0 && (
-                                <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-3xl text-muted-foreground italic">
-                                    คลิก "เพิ่มอันดับ" เพื่อเริ่มบันทึกผลการแข่งขัน
-                                </div>
-                            )}
-
-                            <div className="pt-8 flex justify-end">
-                                <Button
-                                    onClick={handleSave}
-                                    disabled={saving}
-                                    className="h-14 rounded-2xl px-12 shadow-glow bg-emerald-600 hover:bg-emerald-500 font-black text-lg min-w-[200px]"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                            กำลังบันทึก...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="mr-2 h-5 w-5" />
-                                            บันทึกผลการแข่งขัน
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
+                </div>
             </div>
         </div>
     )

@@ -385,6 +385,12 @@ async function main() {
             const rule = scoringRules.find(r => r.rank === rank)
             const points = rule?.points || 0
 
+            // Generate score based on rank (higher rank = higher score for team sports)
+            const isTeamSport = sportTypes.find(st => st.id === event.sportTypeId)?.category === 'TEAM'
+            const score = isTeamSport && rank <= 2
+                ? (rank === 1 ? Math.floor(Math.random() * 5) + 2 : Math.floor(Math.random() * 3))
+                : null
+
             await prisma.eventResult.create({
                 data: {
                     eventId: event.id,
@@ -392,6 +398,7 @@ async function main() {
                     athleteId: athlete?.id,
                     rank: rank,
                     points: points,
+                    score: score,
                     recordedBy: organizer.id,
                 },
             })
@@ -403,6 +410,84 @@ async function main() {
             })
 
             totalResults++
+        }
+
+        // ============================================================
+        // NEW: Create Matches for TEAM sports
+        // ============================================================
+        const eventSportType = sportTypes.find(st => st.id === event.sportTypeId)
+        if (eventSportType?.category === 'TEAM' && shuffledColors.length >= 4) {
+            console.log(`    Creating matches for ${event.name}...`)
+
+            // Create Semi-Finals (Match 1 & 2)
+            const match1 = await prisma.match.create({
+                data: {
+                    eventId: event.id,
+                    roundName: 'รอบรองชนะเลิศ',
+                    roundNumber: 1,
+                    matchNumber: 1,
+                    homeColorId: shuffledColors[0].id,
+                    awayColorId: shuffledColors[1].id,
+                    status: 'COMPLETED',
+                    homeScore: Math.floor(Math.random() * 3) + 1,
+                    awayScore: Math.floor(Math.random() * 2),
+                    scheduledAt: new Date(new Date(event.date).setHours(9, 0, 0, 0)),
+                    bracketPosition: 1,
+                    startedAt: new Date(new Date(event.date).setHours(9, 0, 0, 0)),
+                    endedAt: new Date(new Date(event.date).setHours(10, 30, 0, 0)),
+                }
+            })
+
+            const match2 = await prisma.match.create({
+                data: {
+                    eventId: event.id,
+                    roundName: 'รอบรองชนะเลิศ',
+                    roundNumber: 1,
+                    matchNumber: 2,
+                    homeColorId: shuffledColors[2].id,
+                    awayColorId: shuffledColors[3].id,
+                    status: 'COMPLETED',
+                    homeScore: Math.floor(Math.random() * 2),
+                    awayScore: Math.floor(Math.random() * 3) + 1,
+                    scheduledAt: new Date(new Date(event.date).setHours(11, 0, 0, 0)),
+                    bracketPosition: 2,
+                    startedAt: new Date(new Date(event.date).setHours(11, 0, 0, 0)),
+                    endedAt: new Date(new Date(event.date).setHours(12, 30, 0, 0)),
+                }
+            })
+
+            // Determine winners
+            const winner1Id = (match1.homeScore ?? 0) > (match1.awayScore ?? 0) ? match1.homeColorId : match1.awayColorId
+            const winner2Id = (match2.homeScore ?? 0) > (match2.awayScore ?? 0) ? match2.homeColorId : match2.awayColorId
+
+            // Create Final (Match 3)
+            await prisma.match.create({
+                data: {
+                    eventId: event.id,
+                    roundName: 'รอบชิงชนะเลิศ',
+                    roundNumber: 2,
+                    matchNumber: 1,
+                    homeColorId: winner1Id,
+                    awayColorId: winner2Id,
+                    status: 'SCHEDULED', // ยังไม่แข่ง หรือแข่งแล้วตามต้องการ
+                    scheduledAt: new Date(new Date(event.date).setHours(15, 0, 0, 0)),
+                    bracketPosition: 1,
+                }
+            })
+
+            // Add Participants to Match 1 (Example)
+            const team1Athletes = createdAthletes.filter(a => a.colorId === match1.homeColorId).slice(0, 5)
+            const team2Athletes = createdAthletes.filter(a => a.colorId === match1.awayColorId).slice(0, 5)
+
+            for (const athlete of [...team1Athletes, ...team2Athletes]) {
+                await prisma.matchParticipant.create({
+                    data: {
+                        matchId: match1.id,
+                        athleteId: athlete.id,
+                        colorId: athlete.colorId
+                    }
+                })
+            }
         }
     }
     console.log(`  ✅ Created ${totalResults} event results`)

@@ -2,57 +2,73 @@
 
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/shared/page-header'
-import { EventCard } from '@/components/shared/event-card'
+import { MatchCard } from '@/components/matches/match-card'
 import { SearchInput } from '@/components/shared/search-input'
 import { FilterDropdown } from '@/components/shared/filter-dropdown'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
-import Link from 'next/link'
 
-interface EventResult {
-    rank: number
-    score?: number | null
-    color: {
+interface Match {
+    id: string
+    roundName: string
+    roundNumber: number
+    matchNumber: number
+    homeColorId: string
+    awayColorId: string
+    homeScore: number | null
+    awayScore: number | null
+    status: 'SCHEDULED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
+    scheduledAt: string
+    homeColor: {
         id: string
         name: string
         hexCode: string
     }
-}
-
-interface Event {
-    id: string
-    name: string
-    date: string
-    time: string
-    location?: string
-    status: 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
-    sportType: {
+    awayColor: {
+        id: string
         name: string
-        category: 'INDIVIDUAL' | 'TEAM'
+        hexCode: string
     }
-    results?: EventResult[]
+    event: {
+        id: string
+        name: string
+        sportType: {
+            name: string
+            category: 'INDIVIDUAL' | 'TEAM'
+        }
+    }
 }
 
 export default function ResultsListPage() {
-    const [events, setEvents] = useState<Event[]>([])
+    const [matches, setMatches] = useState<Match[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [sportType, setSportType] = useState('ALL')
     const [sportTypes, setSportTypes] = useState<any[]>([])
 
-    const fetchEvents = async () => {
+    const fetchMatches = async () => {
         try {
             const params = new URLSearchParams({
                 status: 'COMPLETED',
-                search: search,
             })
             if (sportType !== 'ALL') params.append('sportTypeId', sportType)
 
-            const res = await fetch(`/api/events?${params.toString()}`)
+            const res = await fetch(`/api/matches?${params.toString()}`)
             const data = await res.json()
-            setEvents(Array.isArray(data) ? data : data.events || [])
+            
+            // Filter by search if provided
+            let filtered = Array.isArray(data) ? data : []
+            if (search) {
+                filtered = filtered.filter((m: Match) => 
+                    m.event.name.toLowerCase().includes(search.toLowerCase()) ||
+                    m.event.sportType.name.toLowerCase().includes(search.toLowerCase()) ||
+                    m.roundName.toLowerCase().includes(search.toLowerCase())
+                )
+            }
+            
+            setMatches(filtered)
         } catch (error) {
-            console.error('Failed to fetch events:', error)
+            console.error('Failed to fetch matches:', error)
         }
     }
 
@@ -72,35 +88,22 @@ export default function ResultsListPage() {
 
     useEffect(() => {
         setLoading(true)
-        fetchEvents().then(() => setLoading(false))
+        fetchMatches().then(() => setLoading(false))
 
         // Auto-refresh every 15 seconds
-        const interval = setInterval(fetchEvents, 15000)
+        const interval = setInterval(fetchMatches, 15000)
         return () => clearInterval(interval)
     }, [search, sportType])
 
-    // Helper function to extract match score from results
-    const getMatchScore = (event: Event) => {
-        if (!event.results || event.results.length !== 2) return null
-
-        const sortedResults = [...event.results].sort((a, b) => a.rank - b.rank)
-        const hasScores = sortedResults.every(r => r.score !== null && r.score !== undefined)
-
-        if (!hasScores) return null
-
-        return {
-            team1: {
-                name: `สี${sortedResults[0].color.name}`,
-                colorHex: sortedResults[0].color.hexCode,
-                score: sortedResults[0].score ?? 0,
-            },
-            team2: {
-                name: `สี${sortedResults[1].color.name}`,
-                colorHex: sortedResults[1].color.hexCode,
-                score: sortedResults[1].score ?? 0,
-            },
+    // Group matches by event/sport
+    const matchesBySport = matches.reduce((acc: any, match) => {
+        const sportName = match.event.sportType.name
+        if (!acc[sportName]) {
+            acc[sportName] = []
         }
-    }
+        acc[sportName].push(match)
+        return acc
+    }, {})
 
     return (
         <div className="container mx-auto px-4 py-8 space-y-8 min-h-[60vh]">
@@ -113,7 +116,7 @@ export default function ResultsListPage() {
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
                     <SearchInput
-                        placeholder="ค้นหาชื่อรายการ..."
+                        placeholder="ค้นหาชื่อรายการหรือรอบการแข่งขัน..."
                         onSearch={(val) => setSearch(val)}
                     />
                 </div>
@@ -130,31 +133,35 @@ export default function ResultsListPage() {
                 </div>
             </div>
 
-            {/* Grid */}
+            {/* Results Grid */}
             {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-64 w-full rounded-3xl" />)}
                 </div>
-            ) : events.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {events.map((event) => (
-                        <Link key={event.id} href={`/results/${event.id}`}>
-                            <EventCard
-                                name={event.name}
-                                sportType={event.sportType.name}
-                                date={new Date(event.date)}
-                                time={event.time}
-                                location={event.location}
-                                status={event.status}
-                                matchScore={getMatchScore(event)}
-                            />
-                        </Link>
+            ) : matches.length > 0 ? (
+                <div className="space-y-8">
+                    {/* Group by Sport Type */}
+                    {Object.entries(matchesBySport).map(([sportName, sportMatches]: [string, any]) => (
+                        <div key={sportName} className="space-y-4">
+                            <div className="flex items-center gap-3">
+                                <h3 className="text-xl font-bold">{sportName}</h3>
+                                <div className="h-[1px] flex-1 bg-white/10" />
+                                <span className="text-sm text-muted-foreground">
+                                    {sportMatches.length} แมช
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {sportMatches.map((match: Match) => (
+                                    <MatchCard key={match.id} match={match} />
+                                ))}
+                            </div>
+                        </div>
                     ))}
                 </div>
             ) : (
                 <EmptyState
                     title="ไม่พบผลการแข่งขัน"
-                    description="ยังไม่มีรายการที่แข่งขันจบหรือตามเงื่อนไขที่ระบุ"
+                    description="ยังไม่มีแมชที่แข่งขันจบหรือตามเงื่อนไขที่ระบุ"
                 />
             )}
         </div>

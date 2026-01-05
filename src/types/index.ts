@@ -1,7 +1,9 @@
-// Type Definitions
+// Type Definitions - Match-based Tournament System
 
 export type Role = 'ADMIN' | 'ORGANIZER' | 'TEAM_MANAGER' | 'VIEWER'
 export type EventStatus = 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
+export type MatchStatus = 'SCHEDULED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
+export type TournamentType = 'SINGLE_ELIMINATION' | 'ROUND_ROBIN' | 'SINGLE_MATCH'
 export type SportCategory = 'INDIVIDUAL' | 'TEAM'
 export type RegistrationStatus = 'REGISTERED' | 'CONFIRMED' | 'DISQUALIFIED'
 export type AnnouncementType = 'GENERAL' | 'URGENT' | 'RESULT'
@@ -49,7 +51,7 @@ export interface SportType {
     description?: string
 }
 
-// Event
+// Event (กีฬาหลัก เช่น ฟุตบอล)
 export interface Event {
     id: string
     sportTypeId: string
@@ -58,10 +60,49 @@ export interface Event {
     time: string
     location?: string
     status: EventStatus
+    tournamentType?: TournamentType
+    totalRounds?: number
     createdById?: string
     sportType?: SportType
     registrations?: EventRegistration[]
     results?: EventResult[]
+    matches?: Match[]
+}
+
+// Match (แมตช์ย่อย เช่น IT vs CS รอบรอง)
+export interface Match {
+    id: string
+    eventId: string
+    roundName: string
+    roundNumber: number
+    matchNumber: number
+    homeColorId: string
+    awayColorId: string
+    homeScore?: number | null
+    awayScore?: number | null
+    status: MatchStatus
+    scheduledAt: Date
+    startedAt?: Date | null
+    endedAt?: Date | null
+    bracketPosition?: number | null
+    nextMatchId?: string | null
+    notes?: string
+    event?: Event
+    homeColor?: Color
+    awayColor?: Color
+    participants?: MatchParticipant[]
+}
+
+// Match Participant (นักกีฬาที่ลงแข่งในแต่ละแมช)
+export interface MatchParticipant {
+    id: string
+    matchId: string
+    athleteId: string
+    colorId: string
+    position?: string
+    match?: Match
+    athlete?: Athlete
+    color?: Color
 }
 
 // Athlete
@@ -90,7 +131,7 @@ export interface EventRegistration {
     color?: Color
 }
 
-// Event Result
+// Event Result (สรุปผลของ Event สำหรับกีฬาบุคคล หรือสรุปรวม)
 export interface EventResult {
     id: string
     eventId: string
@@ -98,6 +139,7 @@ export interface EventResult {
     athleteId?: string
     rank: number
     points: number
+    score?: number | null
     notes?: string
     color?: Color
     athlete?: Athlete
@@ -107,11 +149,13 @@ export interface EventResult {
 export interface Vote {
     id: string
     eventId: string
+    matchId?: string
     athleteId: string
     voterIp?: string
     voterUserId?: string
     votedAt: Date
     athlete?: Athlete
+    match?: Match
 }
 
 // Vote Summary
@@ -142,6 +186,29 @@ export interface LeaderboardEntry {
     hexCode: string
     totalScore: number
     rank: number
+    // Breakdown ของกีฬาแต่ละประเภท
+    sportBreakdown?: SportBreakdown[]
+}
+
+// Sport Breakdown (แยกคะแนนตามกีฬา)
+export interface SportBreakdown {
+    sportName: string
+    rank: number
+    points: number
+}
+
+// Bracket Node (สำหรับแสดง tournament bracket)
+export interface BracketNode {
+    matchId: string
+    roundNumber: number
+    matchNumber: number
+    homeColor: Color
+    awayColor: Color
+    homeScore?: number | null
+    awayScore?: number | null
+    status: MatchStatus
+    winner?: Color | null
+    nextMatchId?: string | null
 }
 
 // API Response
