@@ -7,8 +7,7 @@ import { SearchInput } from '@/components/shared/search-input'
 import { FilterDropdown } from '@/components/shared/filter-dropdown'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
-
-interface Match {
+interface MatchWithColors {
     id: string
     roundName: string
     roundNumber: number
@@ -18,7 +17,7 @@ interface Match {
     homeScore: number | null
     awayScore: number | null
     status: 'SCHEDULED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'
-    scheduledAt: string
+    scheduledAt: Date | string
     homeColor: {
         id: string
         name: string
@@ -40,7 +39,7 @@ interface Match {
 }
 
 export default function ResultsListPage() {
-    const [matches, setMatches] = useState<Match[]>([])
+    const [matches, setMatches] = useState<MatchWithColors[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [sportType, setSportType] = useState('ALL')
@@ -56,17 +55,23 @@ export default function ResultsListPage() {
             const res = await fetch(`/api/matches?${params.toString()}`)
             const data = await res.json()
             
-            // Filter by search if provided
+            // Filter by search if provided and convert scheduledAt to Date
             let filtered = Array.isArray(data) ? data : []
             if (search) {
-                filtered = filtered.filter((m: Match) => 
-                    m.event.name.toLowerCase().includes(search.toLowerCase()) ||
-                    m.event.sportType.name.toLowerCase().includes(search.toLowerCase()) ||
-                    m.roundName.toLowerCase().includes(search.toLowerCase())
+                filtered = filtered.filter((m: any) => 
+                    m.event?.name?.toLowerCase().includes(search.toLowerCase()) ||
+                    m.event?.sportType?.name?.toLowerCase().includes(search.toLowerCase()) ||
+                    m.roundName?.toLowerCase().includes(search.toLowerCase())
                 )
             }
             
-            setMatches(filtered)
+            // Convert scheduledAt from string to Date
+            const matchesWithDates = filtered.map((m: any) => ({
+                ...m,
+                scheduledAt: m.scheduledAt ? new Date(m.scheduledAt) : new Date()
+            })) as MatchWithColors[]
+            
+            setMatches(matchesWithDates)
         } catch (error) {
             console.error('Failed to fetch matches:', error)
         }
@@ -145,14 +150,22 @@ export default function ResultsListPage() {
                         <div key={sportName} className="space-y-4">
                             <div className="flex items-center gap-3">
                                 <h3 className="text-xl font-bold">{sportName}</h3>
-                                <div className="h-[1px] flex-1 bg-white/10" />
+                                <div className="h-px flex-1 bg-white/10" />
                                 <span className="text-sm text-muted-foreground">
                                     {sportMatches.length} แมช
                                 </span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                {sportMatches.map((match: Match) => (
-                                    <MatchCard key={match.id} match={match} />
+                                {sportMatches.map((match: MatchWithColors) => (
+                                    <MatchCard 
+                                        key={match.id} 
+                                        match={{
+                                            ...match,
+                                            scheduledAt: match.scheduledAt instanceof Date 
+                                                ? match.scheduledAt 
+                                                : new Date(match.scheduledAt)
+                                        }} 
+                                    />
                                 ))}
                             </div>
                         </div>

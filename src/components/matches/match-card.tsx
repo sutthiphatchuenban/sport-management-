@@ -4,12 +4,23 @@ import { Calendar, Clock, MapPin, Trophy } from "lucide-react"
 import { format } from "date-fns"
 import { th } from "date-fns/locale"
 import Link from "next/link"
-import { Match, MatchStatus } from "@/types"
+import { MatchStatus } from "@/types"
 
 interface MatchCardProps {
-    match: Partial<Match> & {
-        homeColor: { hexCode: string; name: string }
-        awayColor: { hexCode: string; name: string }
+    match: {
+        id?: string
+        roundName?: string
+        roundNumber?: number
+        matchNumber?: number
+        homeColorId?: string
+        awayColorId?: string
+        homeScore?: number | null
+        awayScore?: number | null
+        status?: MatchStatus
+        scheduledAt?: Date | string
+        homeColor: { hexCode: string; name: string; [key: string]: any }
+        awayColor: { hexCode: string; name: string; [key: string]: any }
+        event?: any
     }
 }
 
