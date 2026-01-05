@@ -1,0 +1,358 @@
+// Prisma Schema - Sports Management System
+// 16 Models for complete sports day management with voting system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ ENUMS ============
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  TEAM_MANAGER
+  VIEWER
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum SportCategory {
+  INDIVIDUAL
+  TEAM
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  CONFIRMED
+  DISQUALIFIED
+}
+
+enum AnnouncementType {
+  GENERAL
+  URGENT
+  RESULT
+}
+
+enum ActionType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+}
+
+enum AwardType {
+  OVERALL
+  CATEGORY
+  SPECIAL
+}
+
+// ============ MODELS ============
+
+// 1. User - ผู้ใช้งาน
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      Role     @default(VIEWER)
+  majorId   String?
+  colorId   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  major         Major?         @relation(fields: [majorId], references: [id])
+  color         Color?         @relation(fields: [colorId], references: [id])
+  events        Event[]        @relation("EventCreator")
+  eventResults  EventResult[]  @relation("ResultRecorder")
+  athletes      Athlete[]      @relation("AthleteRegistrar")
+  announcements Announcement[]
+  activityLogs  ActivityLog[]
+  votes         Vote[]
+
+  @@map("users")
+}
+
+// 2. Major - สาขาวิชา
+model Major {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  colorId   String?
+  createdAt DateTime @default(now())
+
+  color    Color?    @relation(fields: [colorId], references: [id])
+  users    User[]
+  athletes Athlete[]
+
+  @@map("majors")
+}
+
+// 3. Color - สีทีม
+model Color {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  hexCode    String
+  totalScore Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  majors             Major[]
+  users              User[]
+  athletes           Athlete[]
+  eventRegistrations EventRegistration[]
+  eventResults       EventResult[]
+
+  @@map("colors")
+}
+
+// 4. SportType - ประเภทกีฬา
+model SportType {
+  id              String        @id @default(cuid())
+  name            String
+  category        SportCategory
+  maxParticipants Int?
+  description     String?
+  createdAt       DateTime      @default(now())
+
+  events Event[]
+
+  @@map("sport_types")
+}
+
+// 5. Event - รายการแข่งขัน
+model Event {
+  id          String      @id @default(cuid())
+  sportTypeId String
+  name        String
+  date        DateTime
+  time        String      // เก็บเป็น string "HH:mm"
+  location    String?
+  status      EventStatus @default(UPCOMING)
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  sportType     SportType           @relation(fields: [sportTypeId], references: [id])
+  createdBy     User?               @relation("EventCreator", fields: [createdById], references: [id])
+  scoringRules  ScoringRule[]
+  registrations EventRegistration[]
+  results       EventResult[]
+  voteSettings  VoteSetting?
+  votes         Vote[]
+
+  @@index([status])
+  @@index([date])
+  @@map("events")
+}
+
+// 6. ScoringRule - เกณฑ์การให้คะแนน
+model ScoringRule {
+  id        String   @id @default(cuid())
+  eventId   String?  // null = กฎทั่วไป
+  rank      Int
+  points    Int
+  createdAt DateTime @default(now())
+
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("scoring_rules")
+}
+
+// 7. Athlete - นักกีฬา
+model Athlete {
+  id           String   @id @default(cuid())
+  studentId    String   @unique
+  firstName    String
+  lastName     String
+  nickname     String?
+  majorId      String
+  colorId      String
+  photoUrl     String?
+  registeredBy String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  major            Major               @relation(fields: [majorId], references: [id])
+  color            Color               @relation(fields: [colorId], references: [id])
+  registrar        User?               @relation("AthleteRegistrar", fields: [registeredBy], references: [id])
+  registrations    EventRegistration[]
+  individualResult EventResult[]
+  votes            Vote[]
+  voteSummary      AthleteVoteSummary[]
+  awardWinners     AwardWinner[]
+
+  @@map("athletes")
+}
+
+// 8. EventRegistration - การลงทะเบียนเข้าแข่งขัน
+model EventRegistration {
+  id           String             @id @default(cuid())
+  eventId      String
+  athleteId    String
+  colorId      String
+  status       RegistrationStatus @default(REGISTERED)
+  registeredAt DateTime           @default(now())
+
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  color   Color   @relation(fields: [colorId], references: [id])
+
+  @@unique([eventId, athleteId])
+  @@index([eventId])
+  @@index([colorId])
+  @@map("event_registrations")
+}
+
+// 9. EventResult - ผลการแข่งขัน
+model EventResult {
+  id         String   @id @default(cuid())
+  eventId    String
+  colorId    String
+  athleteId  String?  // สำหรับกีฬาบุคคล
+  rank       Int
+  points     Int
+  notes      String?
+  recordedBy String?
+  recordedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  color    Color    @relation(fields: [colorId], references: [id])
+  athlete  Athlete? @relation(fields: [athleteId], references: [id])
+  recorder User?    @relation("ResultRecorder", fields: [recordedBy], references: [id])
+
+  @@index([colorId, rank])
+  @@index([recordedAt])
+  @@map("event_results")
+}
+
+// 10. Announcement - ประกาศ
+model Announcement {
+  id        String           @id @default(cuid())
+  title     String
+  content   String
+  type      AnnouncementType @default(GENERAL)
+  createdBy String?
+  createdAt DateTime         @default(now())
+
+  author User? @relation(fields: [createdBy], references: [id])
+
+  @@map("announcements")
+}
+
+// 11. ActivityLog - ประวัติการใช้งาน
+model ActivityLog {
+  id        String     @id @default(cuid())
+  userId    String?
+  action    ActionType
+  tableName String?
+  recordId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  createdAt DateTime   @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("activity_logs")
+}
+
+// 12. VoteSetting - การตั้งค่าโหวต
+model VoteSetting {
+  id                  String    @id @default(cuid())
+  eventId             String?   @unique
+  votingEnabled       Boolean   @default(true)
+  votingStart         DateTime?
+  votingEnd           DateTime?
+  maxVotesPerUser     Int       @default(1)
+  showRealtimeResults Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("vote_settings")
+}
+
+// 13. Vote - การโหวต
+model Vote {
+  id            String   @id @default(cuid())
+  eventId       String
+  athleteId     String
+  voterIp       String?
+  voterUserId   String?
+  voterDeviceId String?
+  voteReason    String?
+  isValid       Boolean  @default(true)
+  votedAt       DateTime @default(now())
+
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  voter   User?   @relation(fields: [voterUserId], references: [id])
+
+  @@index([eventId, athleteId])
+  @@index([eventId, voterIp])
+  @@index([eventId, voterDeviceId])
+  @@map("votes")
+}
+
+// 14. AthleteVoteSummary - สรุปคะแนนโหวต
+model AthleteVoteSummary {
+  id          String   @id @default(cuid())
+  athleteId   String
+  eventId     String?  // null = คะแนนรวมทั้งหมด
+  totalVotes  Int      @default(0)
+  rank        Int?
+  lastUpdated DateTime @default(now()) @updatedAt
+
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([athleteId, eventId])
+  @@map("athlete_vote_summary")
+}
+
+// 15. Award - รางวัล
+model Award {
+  id           String    @id @default(cuid())
+  name         String
+  description  String?
+  awardType    AwardType
+  category     String?   // ประเภทกีฬา (ถ้าเป็น category award)
+  criteria     Json?
+  prizeDetails String?
+  imageUrl     String?
+  displayOrder Int?
+  createdAt    DateTime  @default(now())
+
+  winners AwardWinner[]
+
+  @@map("awards")
+}
+
+// 16. AwardWinner - ผู้ได้รับรางวัล
+model AwardWinner {
+  id            String    @id @default(cuid())
+  awardId       String
+  athleteId     String
+  votesReceived Int?
+  score         Float?
+  rank          Int?
+  announcedAt   DateTime?
+  claimed       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  award   Award   @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@map("award_winners")
+}
